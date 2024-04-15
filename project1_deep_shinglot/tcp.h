@@ -63,14 +63,22 @@ typedef struct _tcpHeader // 20 or more bytes
 #define OFS_SHIFT 12
 
 //-----------------------------------------------------------------------------
+// Globals
+//-----------------------------------------------------------------------------
+//socket sMQTT;
+
+//-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
+
+uint32_t getSeqNumber();
+uint32_t getAckNumber();
 
 void setTcpState(uint8_t instance, uint8_t state);
 uint8_t getTcpState(uint8_t instance);
 
 bool isTcp(etherHeader *ether);
-bool isTcpSyn(etherHeader *ether);
+bool isTcpFlag(etherHeader *ether, uint16_t flag);
 bool isTcpAck(etherHeader *ether);
 
 void sendTcpPendingMessages(etherHeader *ether);
