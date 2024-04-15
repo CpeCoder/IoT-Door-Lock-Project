@@ -26,7 +26,6 @@
 // Subroutines
 //-----------------------------------------------------------------------------
 
-void sendPendingMqtt(etherHeader *ether);
 void connectMqtt();
 void disconnectMqtt();
 void publishMqtt(char strTopic[], char strData[]);

@@ -1,5 +1,5 @@
 // TCP Library
-// Deep Shinglot
+// Jason Losh
 
 //-----------------------------------------------------------------------------
 // Hardware Target
@@ -21,7 +21,6 @@
 #include "arp.h"
 #include "tcp.h"
 #include "timer.h"
-#include "mqtt.h"
 
 // ------------------------------------------------------------------------------
 //  Globals
@@ -29,35 +28,23 @@
 
 #define MAX_TCP_PORTS 4
 
-socket sMQTT;
-uint32_t clientSequence;
-uint32_t serverSequence;
-uint16_t payloadSize;
+uint32_t sequenceNumber;
+uint32_t serverSeqNumber;
 uint16_t tcpPorts[MAX_TCP_PORTS];
-uint8_t tcpState[MAX_TCP_PORTS];
 uint8_t tcpPortCount = 0;
+uint8_t tcpState[MAX_TCP_PORTS];
+socket sMQTT;
 
-bool ackInProcess = false;
-bool pshInProcess = false;
 // ------------------------------------------------------------------------------
 //  Structures
 // ------------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
 // Subroutines
+void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[], uint16_t dataSize);
 void sendTcpResponse(etherHeader *ether, socket* s, uint16_t flags);
 
 //-----------------------------------------------------------------------------
-
-uint32_t getSeqNumber()
-{
-    return clientSequence;
-}
-
-uint32_t getAckNumber()
-{
-    return serverSequence + payloadSize;
-}
 
 // Set TCP state
 void setTcpState(uint8_t instance, uint8_t state)
@@ -71,30 +58,6 @@ uint8_t getTcpState(uint8_t instance)
     return tcpState[instance];
 }
 
-void tcpTimeWait()
-{
-    uint8_t i;
-    for(i = 0; i < tcpPortCount; i++)
-    {
-        if(getTcpState(i) == TCP_TIME_WAIT)
-        {
-            setTcpState(i, TCP_CLOSED);
-        }
-    }
-}
-
-void setCloseState()
-{
-    uint8_t i;
-    for(i = 0; i < tcpPortCount; i++)
-    {
-        if(getTcpState(i) == TCP_SYN_RECEIVED)
-        {
-            setTcpState(i, TCP_CLOSED);
-        }
-    }
-}
-
 // Determines whether packet is TCP packet
 // Must be an IP packet
 bool isTcp(etherHeader* ether)
@@ -105,13 +68,13 @@ bool isTcp(etherHeader* ether)
     return ok;
 }
 
-bool isTcpFlag(etherHeader *ether, uint16_t flag)
+bool isTcpSyn(etherHeader *ether)
 {
     bool ok;
     ipHeader *ip   = (ipHeader*)ether->data;
     tcpHeader *tcp = (tcpHeader*)ip->data;
     uint16_t tcp_offset_msb = htons(tcp->offsetFields);
-    ok = tcp_offset_msb & flag;
+    ok = tcp_offset_msb & SYN;
     return ok;
 }
 
@@ -129,20 +92,24 @@ void sendTcpPendingMessages(etherHeader *ether)
 {
     if(tcpPortCount == 0)
     {
-        tcpPorts[tcpPortCount] = 1883;
+        sequenceNumber = random32();
+        serverSeqNumber = 0;
+        tcpPorts[tcpPortCount] = 8080;
         tcpPortCount++;
+        tcpState[0] = TCP_CLOSED;
+
         sMQTT.remoteIpAddress[0] = 192;
         sMQTT.remoteIpAddress[1] = 168;
         sMQTT.remoteIpAddress[2] = 1;
         sMQTT.remoteIpAddress[3] = 1;
-        sMQTT.remoteHwAddress[0] = 0xE0;
-        sMQTT.remoteHwAddress[1] = 0xBE;
-        sMQTT.remoteHwAddress[2] = 0x03;
-        sMQTT.remoteHwAddress[3] = 0x77;
-        sMQTT.remoteHwAddress[4] = 0x05;
-        sMQTT.remoteHwAddress[5] = 0xF7;
-        sMQTT.remotePort = 1883;
-        sMQTT.localPort = 5517;
+/*        sMQTT->remoteHwAddress[0] = 0x6C;
+        sMQTT->remoteHwAddress[1] = 0x02;
+        sMQTT->remoteHwAddress[2] = 0xE0;
+        sMQTT->remoteHwAddress[3] = 0x03;
+        sMQTT->remoteHwAddress[4] = 0xAD;
+        sMQTT->remoteHwAddress[5] = 0x20;*/
+        sMQTT.remotePort = 8080;
+        sMQTT.localPort = 6000;
         sMQTT.acknowledgementNumber = 0;
         sMQTT.sequenceNumber = 0;
     }
@@ -154,10 +121,8 @@ void sendTcpPendingMessages(etherHeader *ether)
         switch(getTcpState(i))
         {
         case TCP_CLOSED:
-            clientSequence = random32();
             sendTcpResponse(ether, &sMQTT, SYN);
             setTcpState(i, TCP_SYN_RECEIVED);
-            startOneshotTimer((_callback)setCloseState, 10);
             break;
         case TCP_SYN_RECEIVED:
             break;
@@ -166,28 +131,6 @@ void sendTcpPendingMessages(etherHeader *ether)
             setTcpState(i, TCP_ESTABLISHED);
             break;
         case TCP_ESTABLISHED:
-            sendPendingMqtt(ether);
-            if(ackInProcess)
-            {
-                sendTcpResponse(ether, &sMQTT, ACK);
-                ackInProcess = false;
-            }
-            else if(pshInProcess)
-            {
-                pshInProcess = false;   // not needed since using MQTT
-            }
-            break;
-        case TCP_FIN_WAIT_2:
-            if(ackInProcess)
-            {
-                stopAllTimers();
-                sendTcpResponse(ether, &sMQTT, ACK|FIN);
-                ackInProcess = false;
-                setTcpState(i, TCP_TIME_WAIT);
-                startOneshotTimer((_callback)tcpTimeWait, 30);
-            }
-            break;
-        case TCP_TIME_WAIT:
             break;
         }
     }
@@ -200,49 +143,23 @@ void processTcpResponse(etherHeader *ether)
     uint8_t i;
     uint16_t tcpSourcePort = htons(tcp->sourcePort);
 
-    if(htons(tcp->destPort) == sMQTT.localPort)
+    for(i = 0; i < tcpPortCount; i++)
     {
-        for(i = 0; i < tcpPortCount; i++)
+        if(tcpSourcePort == tcpPorts[i])
         {
-            if(tcpSourcePort == tcpPorts[i])
-            {
-                break;
-            }
+            break;
         }
-        if(isTcpFlag(ether, SYN) && isTcpAck(ether) && getTcpState(i)==TCP_SYN_RECEIVED)
-        {
-            stopTimer((_callback)setCloseState);
-            setTcpState(i, TCP_SYN_SENT);
-            clientSequence = ntohl(tcp->acknowledgementNumber);
-            serverSequence = ntohl(tcp->sequenceNumber) + 1;        // in initial state packet is count as len 1
-        }
-        else if(isTcpAck(ether) &&  isTcpFlag(ether, PSH) && getTcpState(i)==TCP_ESTABLISHED)
-        {
-            clientSequence = ntohl(tcp->acknowledgementNumber);
-            serverSequence = ntohl(tcp->sequenceNumber);
-            ackInProcess = true;
-        }
-        else if(isTcpAck(ether) && isTcpFlag(ether, FIN))
-        {
-            clientSequence = ntohl(tcp->acknowledgementNumber);
-            serverSequence = ntohl(tcp->sequenceNumber) + 1;        // because payload is zero add 1
-            setTcpState(i, TCP_FIN_WAIT_2);
-            ackInProcess = true;
-        }
-        else if(isTcpAck(ether) && getTcpState(i)==TCP_ESTABLISHED)
-        {
-            clientSequence = ntohl(tcp->acknowledgementNumber);
-            serverSequence = ntohl(tcp->sequenceNumber);
-        }
-        // tcp->offsetFields flags(8b) dataoffset(4b) reserved(4b), this is reserved no ntohs
-            // ans : (dataoffset >> 4) * 4 = dataoffset >> 2
-        payloadSize = ntohs(ip->length) - (ip->size * 4) - ((tcp->offsetFields & 0x00F0) >> 2);
-
-/*        if(payloadSize == 0)
-        {
-            serverSequence++;               // len 0 is considered payload = 1
-        }*/
     }
+    if(isTcpSyn(ether) && isTcpAck(ether) && getTcpState(i)==TCP_SYN_RECEIVED)
+    {
+        setTcpState(i, TCP_SYN_SENT);
+        serverSeqNumber = ntohl(tcp->sequenceNumber);
+    }
+/*    else if()
+    {
+
+    }*/
+
 }
 
 // Must be an ARP response
@@ -265,7 +182,7 @@ void processTcpArpResponse(etherHeader *ether)
         {
             getSocketInfoFromArpResponse(ether, &sMQTT);
             setIpMqttBrokerAddress(sMQTT.remoteIpAddress);
-            tcpPorts[tcpPortCount] = 1883;
+            tcpPorts[tcpPortCount] = 8080;
             tcpPortCount++;
         }
     }
@@ -349,8 +266,8 @@ void sendTcpResponse(etherHeader *ether, socket* s, uint16_t flags)
     tcpLength = sizeof(tcpHeader);   // no options/data in 3-way
     tcp->sourcePort = htons(s->localPort);
     tcp->destPort = htons(s->remotePort);
-    tcp->sequenceNumber = htonl(clientSequence);
-    tcp->acknowledgementNumber = htonl(serverSequence + payloadSize);
+    tcp->sequenceNumber = htonl(sequenceNumber + 1);
+    tcp->acknowledgementNumber = htonl(serverSeqNumber + 1);
     tcp->offsetFields = htons((tcpLength/4)<<12 | flags);
     tcp->windowSize = htons(1460);
     tcp->urgentPointer = htons(0);
@@ -371,14 +288,13 @@ void sendTcpResponse(etherHeader *ether, socket* s, uint16_t flags)
     putEtherPacket(ether, sizeof(etherHeader) + ipHeaderLength + tcpLength);
 }
 
-/*
 // Send TCP message
 void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[], uint16_t dataSize)
 {
     uint8_t localIpAddress[4];
     uint8_t localHwAddress[6];
+    uint8_t i, ipHeaderLength;
     uint8_t *options, *dataPointer;
-    uint16_t i, ipHeaderLength;
     uint16_t tmp16;
     uint16_t tcpLength;
     uint32_t sum;
@@ -413,7 +329,6 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     ipHeaderLength = ip->size * 4;
     tcpHeader *tcp = (tcpHeader*)ip->data;
     options = tcp->data;
-
     *options++ = 2;
     *options++ = 4;
     *options++ = 0x05;      // MSS = 1460
@@ -422,24 +337,22 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     *options++ = 1;         // padding so data begins at new word
     *options++ = 1;
     *options++ = 0;         // End of Option List
-
     dataPointer = options;
 
     // TCP header
     tcpLength = sizeof(tcpHeader) + (options - tcp->data);   // typical: 20 + options (no data)
     tcp->sourcePort = htons(s->localPort);
     tcp->destPort = htons(s->remotePort);
-    tcp->sequenceNumber = htonl(clientSequence);
-    tcp->acknowledgementNumber = htonl(serverSequence + payloadSize);
+    tcp->sequenceNumber = htonl(sequenceNumber + 1);
+    tcp->acknowledgementNumber = htonl(serverSeqNumber + 1);
     tcp->offsetFields = htons((tcpLength/4)<<12 | flags);
     tcp->windowSize = htons(1460);
     tcp->urgentPointer = htons(0);
 
     tcpLength += dataSize;
-    // try without for loop
     for(i = 0; i < dataSize; i++)
     {
-        dataPointer[i] = data[i];
+        *dataPointer++ = data[i];
     }
     ip->length = htons(ipHeaderLength + tcpLength);
 
@@ -458,4 +371,3 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
 
     putEtherPacket(ether, sizeof(etherHeader) + ipHeaderLength + tcpLength);
 }
-*/
