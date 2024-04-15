@@ -541,20 +541,6 @@ int main(void)
                     {
                         sendPingResponse(data);
                     }
-                    // Remove
-                    // Handle UDP datagram
-/*                    if (isUdp(data))
-                    {
-                        udpData = getUdpData(data);
-                        if (strcmp((char*)udpData, "on") == 0)
-                            setPinValue(GREEN_LED, 1);
-                        if (strcmp((char*)udpData, "off") == 0)
-                            setPinValue(GREEN_LED, 0);
-                        getSocketInfoFromUdpPacket(data, &s);
-                        sendUdpMessage(data, s, (uint8_t*)"Received", 9);
-                    }*/
-
-                    // Handle TCP datagram
                     if (isTcp(data))
                     {
                         if (isTcpPortOpen(data))
