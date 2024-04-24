@@ -8,6 +8,7 @@
 #include "nvic.h"
 #include "clock.h"
 #include "uart0.h"
+#include "wait.h"
 #include "tm4c123gh6pm.h"
 
 #define MAX_CHARS 80
@@ -20,6 +21,8 @@ uint8_t count = 0;
 #define kickInt PORTB,2
 
 uint8_t flag = 1;
+uint16_t interruptCounter = 0;
+bool status = false;
 
 void initHw()
 {
@@ -43,7 +46,7 @@ void initHw()
     TIMER0_CTL_R &= ~TIMER_CTL_TAEN;
     TIMER0_CFG_R = TIMER_CFG_32_BIT_TIMER;
     TIMER0_TAMR_R = TIMER_TAMR_TAMR_1_SHOT | TIMER_TAMR_TACDIR;
-    TIMER0_TAILR_R = 80e6;
+    TIMER0_TAILR_R = 200e6;
     TIMER0_IMR_R = TIMER_IMR_TATOIM;
     enableNvicInterrupt(INT_TIMER0A);
 
@@ -62,6 +65,7 @@ void cooldown()
     TIMER0_ICR_R = TIMER_ICR_TATOCINT;
     TIMER0_CTL_R &= ~TIMER_CTL_TAEN;
     flag = 1;
+    interruptCounter = 0;
 }
 
 void pinClear()
@@ -71,11 +75,13 @@ void pinClear()
     if(getPinValue(openDoor))
     {
         setPinValue(openDoor, 0);
+        status = 0;
         putsUart0("Unlocked\n");        //Publish door was unlocked
     }
     if(getPinValue(closeDoor))
     {
         setPinValue(closeDoor, 0);
+        status = 1;
         putsUart0("Locked\n");          //Publish door was locked
     }
 }
@@ -83,23 +89,30 @@ void pinClear()
 void kickIsr()
 {
     clearPinInterrupt(kickInt);
-    if(flag)
+    interruptCounter++;
+    if(status)
     {
-        putsUart0("you got robbed\n");              //Publish that kick was detected
-        TIMER0_CTL_R |= TIMER_CTL_TAEN;
-        flag = 0;
+        if(flag)
+        {
+            TIMER0_CTL_R |= TIMER_CTL_TAEN;
+            flag = 0;
+        }
+        if(interruptCounter == 150)
+        {
+            putsUart0("you got robbed\n");      //Publish that kick was detected
+        }
     }
 }
 
 //Receive correct key from subscriber to unlock/lock door
 void receiver(char * token)
 {
-    if (strcmp(token, "open") == 0)
+    if(strcmp(token, "open") == 0)
     {
         setPinValue(openDoor, 1);
         TIMER1_CTL_R |= TIMER_CTL_TAEN;
     }
-    if (strcmp(token, "close") == 0)
+    if(strcmp(token, "close") == 0)
     {
         setPinValue(closeDoor, 1);
         TIMER1_CTL_R |= TIMER_CTL_TAEN;
@@ -155,4 +168,3 @@ int main(void)
     while(true)
         processShell();
 }
-
