@@ -30,7 +30,7 @@
 #define MAX_TCP_PORTS 4
 
 socket sMQTT;
-uint32_t clientSequence;
+uint32_t serverAck;
 uint32_t serverSequence;
 uint16_t payloadSize;
 uint16_t tcpPorts[MAX_TCP_PORTS];
@@ -51,7 +51,7 @@ void sendTcpResponse(etherHeader *ether, socket* s, uint16_t flags);
 
 uint32_t getSeqNumber()
 {
-    return clientSequence;
+    return serverAck;
 }
 
 uint32_t getAckNumber()
@@ -154,7 +154,7 @@ void sendTcpPendingMessages(etherHeader *ether)
         switch(getTcpState(i))
         {
         case TCP_CLOSED:
-            clientSequence = random32();
+            serverAck = random32();
             sendTcpResponse(ether, &sMQTT, SYN);
             setTcpState(i, TCP_SYN_RECEIVED);
             startOneshotTimer((_callback)setCloseState, 10);
@@ -213,25 +213,25 @@ void processTcpResponse(etherHeader *ether)
         {
             stopTimer((_callback)setCloseState);
             setTcpState(i, TCP_SYN_SENT);
-            clientSequence = ntohl(tcp->acknowledgementNumber);
+            serverAck = ntohl(tcp->acknowledgementNumber);
             serverSequence = ntohl(tcp->sequenceNumber) + 1;        // in initial state packet is count as len 1
         }
         else if(isTcpAck(ether) &&  isTcpFlag(ether, PSH) && getTcpState(i)==TCP_ESTABLISHED)
         {
-            clientSequence = ntohl(tcp->acknowledgementNumber);
+            serverAck = ntohl(tcp->acknowledgementNumber);
             serverSequence = ntohl(tcp->sequenceNumber);
             ackInProcess = true;
         }
         else if(isTcpAck(ether) && isTcpFlag(ether, FIN))
         {
-            clientSequence = ntohl(tcp->acknowledgementNumber);
+            serverAck = ntohl(tcp->acknowledgementNumber);
             serverSequence = ntohl(tcp->sequenceNumber) + 1;        // because payload is zero add 1
             setTcpState(i, TCP_FIN_WAIT_2);
             ackInProcess = true;
         }
         else if(isTcpAck(ether) && getTcpState(i)==TCP_ESTABLISHED)
         {
-            clientSequence = ntohl(tcp->acknowledgementNumber);
+            serverAck = ntohl(tcp->acknowledgementNumber);
             serverSequence = ntohl(tcp->sequenceNumber);
         }
         // tcp->offsetFields flags(8b) dataoffset(4b) reserved(4b), this is reserved no ntohs
@@ -349,7 +349,7 @@ void sendTcpResponse(etherHeader *ether, socket* s, uint16_t flags)
     tcpLength = sizeof(tcpHeader);   // no options/data in 3-way
     tcp->sourcePort = htons(s->localPort);
     tcp->destPort = htons(s->remotePort);
-    tcp->sequenceNumber = htonl(clientSequence);
+    tcp->sequenceNumber = htonl(serverAck);
     tcp->acknowledgementNumber = htonl(serverSequence + payloadSize);
     tcp->offsetFields = htons((tcpLength/4)<<12 | flags);
     tcp->windowSize = htons(1460);
@@ -429,7 +429,7 @@ void sendTcpMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[
     tcpLength = sizeof(tcpHeader) + (options - tcp->data);   // typical: 20 + options (no data)
     tcp->sourcePort = htons(s->localPort);
     tcp->destPort = htons(s->remotePort);
-    tcp->sequenceNumber = htonl(clientSequence);
+    tcp->sequenceNumber = htonl(serverAck);
     tcp->acknowledgementNumber = htonl(serverSequence + payloadSize);
     tcp->offsetFields = htons((tcpLength/4)<<12 | flags);
     tcp->windowSize = htons(1460);

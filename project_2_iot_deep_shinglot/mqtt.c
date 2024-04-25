@@ -322,7 +322,7 @@ void sendMqttMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data
     tcpLength = sizeof(tcpHeader); //+ (options - tcp->data);   // typical: 20 + options (no data)
     tcp->sourcePort = htons(s->localPort);
     tcp->destPort = htons(s->remotePort);
-    tcp->sequenceNumber = htonl(getSeqNumber());            // clientSequence
+    tcp->sequenceNumber = htonl(getSeqNumber());            // serverAck
     tcp->acknowledgementNumber = htonl(getAckNumber());     // serverSequence + payloadSize
     tcp->offsetFields = htons((tcpLength/4)<<12 | flags);
     tcp->windowSize = htons(1460);
