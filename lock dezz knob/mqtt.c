@@ -117,7 +117,12 @@ void processMqttPublish(etherHeader *ether, uint16_t payload)
     }
     else if(!strcmp(topicStr, "uta/lock/kickin"))    // door sub, user pub
     {
+        putsUart0("\n--------------------------------\n");
+        putsUart0  ("  >>>  ");
         putsUart0(dataStr);
+        putsUart0  ("  <<<  ");
+        putsUart0("--------------------------------\n");
+        putsUart0("\n");
     }
     else if(!strcmp(topicStr, "uta/lock/get_public_key"))   // door pub, user sub
     {

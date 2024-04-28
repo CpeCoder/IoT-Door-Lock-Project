@@ -1,4 +1,5 @@
-//Ryan Dharmadi
+// Deep Shinglot
+// Ryan Dharmadi
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -18,8 +19,7 @@ char token[50];
 uint8_t flag = 1, tokenSize;
 const uint16_t password = 40925;
 uint16_t interruptCounter = 0;
-bool motorNeeded = false, doorStatus = false, doorTampered = false, keyRequest = false,
-        isSendChallengeResponse = false;
+bool motorNeeded = false, doorStatus = false, doorTampered = false, keyRequest = false;
 
 int range, publicKey, privateKey;
 char clientArr[5];
@@ -180,11 +180,6 @@ void sendDoorMessage(etherHeader *ether, socket *s)
     {
         publishMqtt("uta/lock/get_public_key" , clientArr);
         keyRequest = false;
-    }
-    if(isSendChallengeResponse)
-    {
-        publishMqtt("uta/lock/challenge_response" , clientArr);
-        isSendChallengeResponse = false;
     }
 }
 
