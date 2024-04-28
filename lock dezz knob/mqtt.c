@@ -100,6 +100,16 @@ void processMqttPublish(etherHeader *ether, uint16_t payload)
     dataLength = packetSize - topicLength - 2;  // 2 for topic length index
     uint8_t *data = mqtt;
 
+    char *dataStr = (char *)malloc((dataLength+1) * sizeof(char));
+    if(dataStr == NULL)
+    {
+        return;
+    }
+    for(i = 0; i < dataLength; i++)
+    {
+        dataStr[i] = (char)*mqtt++;
+    }
+    dataStr[i] = NULL;
 
     if(!strcmp(topicStr, "uta/lock/challenge_request"))    // door sub, user pub
     {
@@ -107,8 +117,7 @@ void processMqttPublish(etherHeader *ether, uint16_t payload)
     }
     else if(!strcmp(topicStr, "uta/lock/kickin"))    // door sub, user pub
     {
-        data = (char*) data;
-        putsUart0(data);
+        putsUart0(dataStr);
     }
     else if(!strcmp(topicStr, "uta/lock/get_public_key"))   // door pub, user sub
     {

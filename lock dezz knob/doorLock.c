@@ -136,7 +136,7 @@ void sendChallengeResponse(char *data, uint16_t dataLength)
 
 void processChallengeRespond(uint8_t *data, uint16_t dataLength)
 {
-    int clientInput = atoi(data);
+    int clientInput = atoi((char *)data);
     int decryptedData = decrypt(clientInput, (int)privateKey, (int)range);
 
     if(decryptedData == password)
