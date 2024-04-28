@@ -1,40 +1,31 @@
-// MQTT Library
-// Deep Shinglot
+// NVIC Library
+// Jason Losh
+
 //-----------------------------------------------------------------------------
 // Hardware Target
 //-----------------------------------------------------------------------------
 
-// Target Platform: -
-// Target uC:       -
+// Target Platform: EK-TM4C123GXL
+// Target uC:       TM4C123GH6PM
 // System Clock:    -
 
-// Hardware configuration:
-// -
+// Hardware configuration: -
 
 //-----------------------------------------------------------------------------
 // Device includes, defines, and assembler directives
 //-----------------------------------------------------------------------------
 
-#ifndef MQTT_H_
-#define MQTT_H_
+#ifndef NVIC_H_
+#define NVIC_H_
 
 #include <stdint.h>
-#include <stdbool.h>
-#include "tcp.h"
 
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------
 
-void processMqttPublish(etherHeader *ether, uint16_t payload);
-bool isPublishMessage(etherHeader *ether, uint16_t payload);
-void sendPendingMqtt(etherHeader *ether);
-void sendMqttMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data[], uint16_t dataSize);
-void connectMqtt();
-void disconnectMqtt();
-void publishMqtt(char strTopic[], char strData[]);
-void subscribeMqtt(char strTopic[]);
-void unsubscribeMqtt(char strTopic[]);
+void enableNvicInterrupt(uint8_t vectorNumber);
+void disableNvicInterrupt(uint8_t vectorNumber);
+void setNvicInterruptPriority(uint8_t vectorNumber, uint8_t priority);
 
 #endif
-

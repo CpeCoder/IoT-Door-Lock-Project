@@ -1,5 +1,5 @@
 // IP Library
-// Jason Losh
+// Deep Shinglot
 
 //-----------------------------------------------------------------------------
 // Hardware Target

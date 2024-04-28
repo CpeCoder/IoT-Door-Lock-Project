@@ -463,6 +463,7 @@ int main(void)
     // Init controller
     initHw();
 
+
     // Setup UART0
     initUart0();
     setUart0BaudRate(115200, 40e6);

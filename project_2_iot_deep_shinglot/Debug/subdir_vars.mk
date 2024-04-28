@@ -10,6 +10,7 @@ C_SRCS += \
 ../arp.c \
 ../clock.c \
 ../dhcp.c \
+../doorLock.c \
 ../eeprom.c \
 ../eth0.c \
 ../ethernet.c \
@@ -17,6 +18,7 @@ C_SRCS += \
 ../icmp.c \
 ../ip.c \
 ../mqtt.c \
+../nvic.c \
 ../socket.c \
 ../spi0.c \
 ../tcp.c \
@@ -30,6 +32,7 @@ C_DEPS += \
 ./arp.d \
 ./clock.d \
 ./dhcp.d \
+./doorLock.d \
 ./eeprom.d \
 ./eth0.d \
 ./ethernet.d \
@@ -37,6 +40,7 @@ C_DEPS += \
 ./icmp.d \
 ./ip.d \
 ./mqtt.d \
+./nvic.d \
 ./socket.d \
 ./spi0.d \
 ./tcp.d \
@@ -50,6 +54,7 @@ OBJS += \
 ./arp.obj \
 ./clock.obj \
 ./dhcp.obj \
+./doorLock.obj \
 ./eeprom.obj \
 ./eth0.obj \
 ./ethernet.obj \
@@ -57,6 +62,7 @@ OBJS += \
 ./icmp.obj \
 ./ip.obj \
 ./mqtt.obj \
+./nvic.obj \
 ./socket.obj \
 ./spi0.obj \
 ./tcp.obj \
@@ -70,6 +76,7 @@ OBJS__QUOTED += \
 "arp.obj" \
 "clock.obj" \
 "dhcp.obj" \
+"doorLock.obj" \
 "eeprom.obj" \
 "eth0.obj" \
 "ethernet.obj" \
@@ -77,6 +84,7 @@ OBJS__QUOTED += \
 "icmp.obj" \
 "ip.obj" \
 "mqtt.obj" \
+"nvic.obj" \
 "socket.obj" \
 "spi0.obj" \
 "tcp.obj" \
@@ -90,6 +98,7 @@ C_DEPS__QUOTED += \
 "arp.d" \
 "clock.d" \
 "dhcp.d" \
+"doorLock.d" \
 "eeprom.d" \
 "eth0.d" \
 "ethernet.d" \
@@ -97,6 +106,7 @@ C_DEPS__QUOTED += \
 "icmp.d" \
 "ip.d" \
 "mqtt.d" \
+"nvic.d" \
 "socket.d" \
 "spi0.d" \
 "tcp.d" \
@@ -110,6 +120,7 @@ C_SRCS__QUOTED += \
 "../arp.c" \
 "../clock.c" \
 "../dhcp.c" \
+"../doorLock.c" \
 "../eeprom.c" \
 "../eth0.c" \
 "../ethernet.c" \
@@ -117,6 +128,7 @@ C_SRCS__QUOTED += \
 "../icmp.c" \
 "../ip.c" \
 "../mqtt.c" \
+"../nvic.c" \
 "../socket.c" \
 "../spi0.c" \
 "../tcp.c" \

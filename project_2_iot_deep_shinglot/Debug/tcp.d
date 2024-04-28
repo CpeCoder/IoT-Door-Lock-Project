@@ -23,6 +23,7 @@ tcp.obj: ../tcp.h
 tcp.obj: ../socket.h
 tcp.obj: ../timer.h
 tcp.obj: ../mqtt.h
+tcp.obj: ../doorLock.h
 
 ../tcp.c:
 
@@ -69,4 +70,6 @@ tcp.obj: ../mqtt.h
 ../timer.h:
 
 ../mqtt.h:
+
+../doorLock.h:
 

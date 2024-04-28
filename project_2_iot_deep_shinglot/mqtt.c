@@ -21,6 +21,8 @@
 #include <string.h>
 #include "mqtt.h"
 #include "timer.h"
+#include "doorLock.h"
+#include "uart0.h"
 
 #define MAX_MESSAGE_SIZE 1460
 #define MAX_SUBSCRIPTION 5
@@ -56,20 +58,84 @@ void sendMqttPingReq()
     mqttPingNeeded = true;
 }
 
+bool isPublishMessage(etherHeader *ether, uint16_t payload)
+{
+    uint8_t *mqtt = ((tcpHeader *)(((ipHeader *)(ether->data))->data))->data ;
+
+    if(*mqtt == 0x30)
+    {
+        return true;
+    }
+    return false;
+}
+
+void processMqttPublish(etherHeader *ether, uint16_t payload)
+{
+    uint8_t *mqtt = ((tcpHeader *)(((ipHeader *)(ether->data))->data))->data ;
+    uint8_t multiplier = 1, encodedByte, i;
+    uint16_t topicLength, dataLength, packetSize = 0;
+
+    mqtt++;     // makes point to the remaining legth bytes
+    do{
+        encodedByte = *mqtt++;          // points to topic length
+        packetSize += (encodedByte & 0x7F) * multiplier;
+        multiplier *= 128;
+    }while((encodedByte & 128) != 0);
+
+
+    topicLength = (uint16_t)((*mqtt++ << 8) & 0xFF00);
+    topicLength += (uint16_t)(*mqtt++ & 0x00FF);
+
+    char *topicStr = (char *)malloc((topicLength+1) * sizeof(char));
+    if(topicStr == NULL)
+    {
+        return;
+    }
+    for(i = 0; i < topicLength; i++)
+    {
+        topicStr[i] = (char)*mqtt++;
+    }
+    topicStr[i] = NULL;
+
+    dataLength = packetSize - topicLength - 2;  // 2 for topic length index
+    uint8_t *data = mqtt;
+
+
+    if(!strcmp(topicStr, "uta/lock/challenge_request"))    // door sub, user pub
+    {
+        processChallengeRequestSendPublicKey(data, dataLength);
+    }
+    else if(!strcmp(topicStr, "uta/lock/kickin"))    // door sub, user pub
+    {
+        data = (char*) data;
+        putsUart0(data);
+    }
+    else if(!strcmp(topicStr, "uta/lock/get_public_key"))   // door pub, user sub
+    {
+        processKey(data);
+        putsUart0("Key Recieved :D\nSend Response.\n");
+    }
+    else if(!strcmp(topicStr, "uta/lock/challenge_response"))   // door sub, user pub
+    {
+        processChallengeRespond(data, dataLength);
+        // psw == psw
+    }
+}
+
 void connectMqtt()
 {
     sMQTT.remoteIpAddress[0] = 192;
     sMQTT.remoteIpAddress[1] = 168;
     sMQTT.remoteIpAddress[2] = 1;
     sMQTT.remoteIpAddress[3] = 1;
-    sMQTT.remoteHwAddress[0] = 0xE0;
+/*    sMQTT.remoteHwAddress[0] = 0xE0;
     sMQTT.remoteHwAddress[1] = 0xBE;
     sMQTT.remoteHwAddress[2] = 0x03;
     sMQTT.remoteHwAddress[3] = 0x77;
     sMQTT.remoteHwAddress[4] = 0x05;
-    sMQTT.remoteHwAddress[5] = 0xF7;
+    sMQTT.remoteHwAddress[5] = 0xF7;*/
     sMQTT.remotePort = 1883;
-    sMQTT.localPort = 5517;
+    sMQTT.localPort = 5550;
 
     sendMqttConnect  = true;
     dataSize = 0;
@@ -86,16 +152,27 @@ void connectMqtt()
     data[dataSize++] = 0x04;        // 8.  protocol level, level 4 for v3.1.1
     data[dataSize++] = 0x02;        // 9.  flags (user, passw, retain, QoS, QoS, flag, clean, rev)
     data[dataSize++] = 0x00;        // 10. keep alive MSB - 0
-    data[dataSize++] = 0x3C;        // 11. keep alibe LSB - 60 seconds
-    data[dataSize++] = 0x00;        // 12. string lenfth MSB --------- client id
-    data[dataSize++] = 0x07;        // 13. string length LSB
-    data[dataSize++] = 0x79;        // 14. 'y'
-    data[dataSize++] = 0x6F;        // 15. 'o'
-    data[dataSize++] = 0x42;        // 16. 'B'
-    data[dataSize++] = 0x49;        // 17. 'I'
-    data[dataSize++] = 0x54;        // 18. 'T'
-    data[dataSize++] = 0x43;        // 19. 'C'
-    data[dataSize++] = 0x48;        // 20. 'H'      // data size 21
+    data[dataSize++] = 0x3C;        // 11. keep alive LSB - 60 seconds
+
+    char clientID[] = "Theif";
+    uint16_t clientStrSize = strlen(clientID);
+
+    if(clientStrSize <= 0xFF)
+    {
+        data[dataSize++] = 0x00;        // 12. string lenfth MSB --------- client id
+        data[dataSize++] = clientStrSize;        // 13. string length LSB
+    }
+    else
+    {
+        data[dataSize++] = (clientStrSize >> 8) & 0xFF;
+        data[dataSize++] = clientStrSize & 0xFF;
+    }
+
+    uint8_t i;
+    for(i = 0; i < clientStrSize; i++)
+    {
+        data[dataSize++] = clientID[i];
+    }
 
     data[1] = dataSize - 2;         // data[1] is length of packet (subtract 2 - header type and length)
     startPeriodicTimer((_callback)sendMqttPingReq, 40);
@@ -118,11 +195,19 @@ void publishMqtt(char strTopic[], char strData[])
     sendMqttPublish = true;
     dataSize = 0;
 
+    if(!strcmp(strTopic, "uta/lock/challenge_response"))   // door pub, user sub
+    {
+        sendChallengeResponse(strData, sizeof(strData));
+    }
     uint16_t topicLength = (uint16_t)strlen(strTopic);
     uint16_t dataLength = (uint16_t)strlen(strData);
     uint16_t remainingLength = topicLength + dataLength + 2; // 2 bytes for topic length
     uint16_t i;
-
+    if(!strcmp(strTopic, "uta/lock/get_public_key"))
+    {
+        remainingLength += 4;
+        dataLength = 4;
+    }
     // MQTT PUBLISH packet
     data[dataSize++] = 0x30; // header type 3, 4b (DUP, QoS, QoS, Retain)
 
@@ -232,6 +317,7 @@ void sendPendingMqtt(etherHeader *ether)
 {
     if(sendMqttConnect)
     {
+        initDoor();
         sendMqttConnect = false;
         sendMqttMessage(ether, &sMQTT, ACK|PSH, data, dataSize);
     }
@@ -322,7 +408,7 @@ void sendMqttMessage(etherHeader *ether, socket *s, uint16_t flags, uint8_t data
     tcpLength = sizeof(tcpHeader); //+ (options - tcp->data);   // typical: 20 + options (no data)
     tcp->sourcePort = htons(s->localPort);
     tcp->destPort = htons(s->remotePort);
-    tcp->sequenceNumber = htonl(getSeqNumber());            // serverAck
+    tcp->sequenceNumber = htonl(getSeqNumber());            // clientSequence
     tcp->acknowledgementNumber = htonl(getAckNumber());     // serverSequence + payloadSize
     tcp->offsetFields = htons((tcpLength/4)<<12 | flags);
     tcp->windowSize = htons(1460);

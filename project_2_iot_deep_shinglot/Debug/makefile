@@ -11,6 +11,7 @@ ORDERED_OBJS += \
 "./arp.obj" \
 "./clock.obj" \
 "./dhcp.obj" \
+"./doorLock.obj" \
 "./eeprom.obj" \
 "./eth0.obj" \
 "./ethernet.obj" \
@@ -18,6 +19,7 @@ ORDERED_OBJS += \
 "./icmp.obj" \
 "./ip.obj" \
 "./mqtt.obj" \
+"./nvic.obj" \
 "./socket.obj" \
 "./spi0.obj" \
 "./tcp.obj" \
@@ -149,15 +151,15 @@ all: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 project1_deep_shinglot.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 	@echo 'Building target: "$@"'
 	@echo 'Invoking: Arm Linker'
-	"/home/deep/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 -me --define=ccs="ccs" --define=PART_TM4C123GH6PM -g --gcc --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi -z -m"project1_deep_shinglot.map" --heap_size=0 --stack_size=16384 -i"/home/deep/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/lib" -i"/home/deep/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include" --reread_libs --diag_wrap=off --display_error_number --warn_sections --xml_link_info="project1_deep_shinglot_linkInfo.xml" --rom_model -o "project1_deep_shinglot.out" $(ORDERED_OBJS)
+	"/home/deep/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/bin/armcl" -mv7M4 --code_state=16 --float_support=FPv4SPD16 -me --define=ccs="ccs" --define=PART_TM4C123GH6PM -g --gcc --diag_warning=225 --diag_wrap=off --display_error_number --abi=eabi -z -m"project1_deep_shinglot.map" --heap_size=1024 --stack_size=10000 -i"/home/deep/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/lib" -i"/home/deep/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include" --reread_libs --diag_wrap=off --display_error_number --warn_sections --xml_link_info="project1_deep_shinglot_linkInfo.xml" --rom_model -o "project1_deep_shinglot.out" $(ORDERED_OBJS)
 	@echo 'Finished building target: "$@"'
 	@echo ' '
 
 # Other Targets
 clean:
 	-$(RM) $(EXE_OUTPUTS__QUOTED)
-	-$(RM) "arp.obj" "clock.obj" "dhcp.obj" "eeprom.obj" "eth0.obj" "ethernet.obj" "gpio.obj" "icmp.obj" "ip.obj" "mqtt.obj" "socket.obj" "spi0.obj" "tcp.obj" "timer.obj" "tm4c123gh6pm_startup_ccs.obj" "uart0.obj" "udp.obj" "wait.obj" 
-	-$(RM) "arp.d" "clock.d" "dhcp.d" "eeprom.d" "eth0.d" "ethernet.d" "gpio.d" "icmp.d" "ip.d" "mqtt.d" "socket.d" "spi0.d" "tcp.d" "timer.d" "tm4c123gh6pm_startup_ccs.d" "uart0.d" "udp.d" "wait.d" 
+	-$(RM) "arp.obj" "clock.obj" "dhcp.obj" "doorLock.obj" "eeprom.obj" "eth0.obj" "ethernet.obj" "gpio.obj" "icmp.obj" "ip.obj" "mqtt.obj" "nvic.obj" "socket.obj" "spi0.obj" "tcp.obj" "timer.obj" "tm4c123gh6pm_startup_ccs.obj" "uart0.obj" "udp.obj" "wait.obj" 
+	-$(RM) "arp.d" "clock.d" "dhcp.d" "doorLock.d" "eeprom.d" "eth0.d" "ethernet.d" "gpio.d" "icmp.d" "ip.d" "mqtt.d" "nvic.d" "socket.d" "spi0.d" "tcp.d" "timer.d" "tm4c123gh6pm_startup_ccs.d" "uart0.d" "udp.d" "wait.d" 
 	-@echo 'Finished clean'
 	-@echo ' '
 
